@@ -59,10 +59,16 @@ export default function App() {
     setIsBusy(true);
     try {
       const result = await apiCall("/api/schema/collections");
+      if (!Array.isArray(result?.data)) {
+        throw new Error("Unexpected API response while listing collections.");
+      }
+
       setCollectionsOutput(result.data.length > 0 ? result.data.join("\n") : "No collections found.");
       setStatusText(`List all collections successful. Count: ${result.count}`);
     } catch (err) {
-      setCollectionsOutput("Unable to load collections.");
+      setCollectionsOutput(
+        `Unable to load collections.\n\nReason: ${err.message}\nCheck backend CORS and API URL.`
+      );
       setStatusText(`List all collections failed: ${err.message}`);
     } finally {
       setIsBusy(false);
