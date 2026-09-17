@@ -18,4 +18,5 @@ npm run dev
 - List all collections in `resume_db`
 - Describe a selected collection schema
 - Create a new collection with JSON schema fields and bson types
+- Load an existing collection and edit field names, deletes, additions, and bson types
 - Display backend command result, return code, and resulting schema

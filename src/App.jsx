@@ -4,8 +4,114 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "https://resume-backend-fnjs.onrender.com";
 
 const DEFAULT_FIELD = { name: "", bsonType: "string", required: true };
+const DEFAULT_EDIT_FIELD = {
+  originalName: "",
+  name: "",
+  bsonType: "string",
+  required: false,
+  deleted: false,
+  isNew: true,
+};
 
 const prettify = (value) => JSON.stringify(value, null, 2);
+
+const normalizeBsonType = (definition) => {
+  if (!definition || typeof definition !== "object") {
+    return "string";
+  }
+
+  if (Array.isArray(definition.bsonType)) {
+    return definition.bsonType.find((type) => type !== "null") || definition.bsonType[0] || "string";
+  }
+
+  return definition.bsonType || "string";
+};
+
+const buildEditableRows = (schemaData) => {
+  const schema = schemaData?.validatorSchema || schemaData?.sampledSchema;
+  const requiredSet = new Set(Array.isArray(schemaData?.validatorSchema?.required) ? schemaData.validatorSchema.required : []);
+  const properties = schema?.properties || {};
+
+  return Object.entries(properties)
+    .filter(([fieldName]) => fieldName !== "_id")
+    .map(([fieldName, definition]) => ({
+      originalName: fieldName,
+      name: fieldName,
+      bsonType: normalizeBsonType(definition),
+      required: requiredSet.has(fieldName),
+      deleted: false,
+      isNew: false,
+    }));
+};
+
+function SchemaFieldRow({
+  row,
+  index,
+  supportedTypes,
+  mode,
+  onChange,
+  onAddRow,
+  onToggleDelete,
+}) {
+  const isDisabled = mode === "edit" && row.deleted;
+
+  return (
+    <div className={`schema-row ${row.deleted ? "schema-row-deleted" : ""}`}>
+      <div className="field-copy">
+        <span className="field-label">Field name</span>
+        <input
+          type="text"
+          placeholder="Field name"
+          value={row.name}
+          disabled={isDisabled}
+          onChange={(event) => onChange(index, "name", event.target.value)}
+        />
+      </div>
+
+      <div className="field-copy">
+        <span className="field-label">Type</span>
+        <select
+          value={row.bsonType}
+          disabled={isDisabled}
+          onChange={(event) => onChange(index, "bsonType", event.target.value)}
+        >
+          {supportedTypes.map((type) => (
+            <option value={type} key={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <label className="required-box field-copy">
+        <span className="field-label">Required</span>
+        <input
+          type="checkbox"
+          checked={row.required}
+          disabled={isDisabled}
+          onChange={(event) => onChange(index, "required", event.target.checked)}
+        />
+        Required
+      </label>
+
+      <button type="button" className="icon-btn" onClick={onAddRow}>
+        +
+      </button>
+
+      {mode === "edit" && (
+        <button type="button" className="secondary" onClick={() => onToggleDelete(index)}>
+          {row.deleted ? "Restore" : row.isNew ? "Remove" : "Delete"}
+        </button>
+      )}
+
+      {mode === "edit" && row.originalName && (
+        <div className="field-meta">Original: {row.originalName}</div>
+      )}
+
+      {mode === "edit" && row.isNew && <div className="field-meta">New field</div>}
+    </div>
+  );
+}
 
 async function apiCall(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -31,6 +137,10 @@ export default function App() {
   const [createName, setCreateName] = useState("");
   const [rows, setRows] = useState([{ ...DEFAULT_FIELD }]);
   const [showSchemaBuilder, setShowSchemaBuilder] = useState(false);
+
+  const [editName, setEditName] = useState("");
+  const [editRows, setEditRows] = useState([{ ...DEFAULT_EDIT_FIELD }]);
+  const [showEditBuilder, setShowEditBuilder] = useState(false);
 
   const [statusText, setStatusText] = useState("Status messages and command output will appear here.");
   const [isBusy, setIsBusy] = useState(false);
@@ -143,6 +253,142 @@ export default function App() {
     setShowSchemaBuilder(false);
   };
 
+  const addEditRow = () => {
+    setEditRows((prev) => [...prev, { ...DEFAULT_EDIT_FIELD }]);
+  };
+
+  const updateEditRow = (index, key, value) => {
+    setEditRows((prev) =>
+      prev.map((row, rowIndex) =>
+        rowIndex === index
+          ? {
+              ...row,
+              [key]: key === "required" ? Boolean(value) : value,
+            }
+          : row
+      )
+    );
+  };
+
+  const toggleDeleteEditRow = (index) => {
+    setEditRows((prev) =>
+      prev.flatMap((row, rowIndex) => {
+        if (rowIndex !== index) {
+          return [row];
+        }
+
+        if (row.isNew) {
+          return [];
+        }
+
+        return [
+          {
+            ...row,
+            deleted: !row.deleted,
+          },
+        ];
+      })
+    );
+  };
+
+  const clearEditBuilder = () => {
+    setEditRows([{ ...DEFAULT_EDIT_FIELD }]);
+    setShowEditBuilder(false);
+  };
+
+  const loadCollectionForEdit = async () => {
+    if (!editName.trim()) {
+      setStatusText("Please enter a collection name to load for editing.");
+      return;
+    }
+
+    setIsBusy(true);
+    try {
+      const result = await apiCall(`/api/schema/collections/${encodeURIComponent(editName.trim())}`);
+      const editableRows = buildEditableRows(result.data);
+
+      if (editableRows.length === 0) {
+        throw new Error("The collection does not expose an editable schema.");
+      }
+
+      setEditRows(editableRows);
+      setShowEditBuilder(true);
+      setDescribeOutput(prettify(result.data));
+      setStatusText(`Loaded collection for editing: ${editName.trim()}`);
+    } catch (err) {
+      setShowEditBuilder(false);
+      setEditRows([{ ...DEFAULT_EDIT_FIELD }]);
+      setStatusText(`Load for edit failed: ${err.message}`);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const submitEditCollection = async () => {
+    if (!editName.trim()) {
+      setStatusText("Collection name is required for editing.");
+      return;
+    }
+
+    const normalized = editRows.map((row) => ({
+      originalName: row.originalName?.trim() || "",
+      name: row.name?.trim() || "",
+      bsonType: row.bsonType,
+      required: row.required,
+      deleted: Boolean(row.deleted),
+      isNew: Boolean(row.isNew) || !row.originalName,
+    }));
+
+    const activeNames = new Set();
+    for (const row of normalized) {
+      if (row.deleted) {
+        continue;
+      }
+
+      if (!row.name) {
+        setStatusText("Each active field must have a field name before saving.");
+        return;
+      }
+
+      if (activeNames.has(row.name)) {
+        setStatusText(`Duplicate field name detected: ${row.name}`);
+        return;
+      }
+
+      activeNames.add(row.name);
+    }
+
+    setIsBusy(true);
+    try {
+      const result = await apiCall(`/api/schema/collections/${encodeURIComponent(editName.trim())}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          fields: normalized,
+        }),
+      });
+
+      const refreshed = await apiCall(`/api/schema/collections/${encodeURIComponent(editName.trim())}`);
+
+      setEditRows(buildEditableRows(refreshed.data));
+      setDescribeOutput(prettify(refreshed.data));
+      setStatusText(
+        [
+          `Collection schema updated successfully: ${editName.trim()}`,
+          `matchedDocuments: ${result.data.matchedDocuments}`,
+          `modifiedDocuments: ${result.data.modifiedDocuments}`,
+          "commandRan:",
+          prettify(result.data.commandRan),
+          "updatedSchema:",
+          prettify(result.data.updatedSchema),
+        ].join("\n")
+      );
+    } catch (err) {
+      setStatusText(`Edit failed: ${err.message}`);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   const submitCollection = async () => {
     if (!createName.trim()) {
       setStatusText("Collection name is required.");
@@ -250,6 +496,48 @@ export default function App() {
 
           {showSchemaBuilder && (
             <div className="builder">
+
+        <section className="card">
+          <h2>4) Edit an existing collection</h2>
+          <div className="inline-row">
+            <input
+              type="text"
+              placeholder="Collection name to edit"
+              value={editName}
+              onChange={(event) => setEditName(event.target.value)}
+            />
+            <button type="button" onClick={loadCollectionForEdit} disabled={isBusy}>
+              Load collection schema
+            </button>
+          </div>
+
+          {showEditBuilder && (
+            <div className="builder">
+              <h3>Edit collection fields</h3>
+              {editRows.map((row, index) => (
+                <SchemaFieldRow
+                  key={`${row.originalName || row.name || "new"}-${index}`}
+                  row={row}
+                  index={index}
+                  supportedTypes={supportedTypes}
+                  mode="edit"
+                  onChange={updateEditRow}
+                  onAddRow={addEditRow}
+                  onToggleDelete={toggleDeleteEditRow}
+                />
+              ))}
+
+              <div className="builder-actions">
+                <button type="button" onClick={submitEditCollection} disabled={isBusy}>
+                  Save schema changes
+                </button>
+                <button type="button" className="secondary" onClick={clearEditBuilder} disabled={isBusy}>
+                  Close editor
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
               <h3>Define collection variables</h3>
               {rows.map((row, index) => (
                 <div key={`${index}-${row.name}`} className="builder-row">
