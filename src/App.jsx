@@ -177,6 +177,7 @@ export default function App() {
   const [describeOutput, setDescribeOutput] = useState("No description loaded yet.");
   const [backendHealth, setBackendHealth] = useState(null);
   const [systemStatus, setSystemStatus] = useState(null);
+  const [lastStatusFetchAt, setLastStatusFetchAt] = useState("");
 
   const [createName, setCreateName] = useState("");
   const [rows, setRows] = useState([{ ...DEFAULT_FIELD }]);
@@ -188,6 +189,7 @@ export default function App() {
 
   const [statusText, setStatusText] = useState("Status messages and command output will appear here.");
   const [isBusy, setIsBusy] = useState(false);
+  const fetchTimeStorageKey = "lastSuccessfulConnectivityCheckAt";
 
   const supportedTypes = useMemo(
     () => [
@@ -226,9 +228,20 @@ export default function App() {
     } else {
       setSystemStatus(null);
     }
+
+    if (healthResult.status === "fulfilled" && statusResult.status === "fulfilled") {
+      const fetchTime = new Date().toISOString();
+      setLastStatusFetchAt(fetchTime);
+      window.localStorage.setItem(fetchTimeStorageKey, fetchTime);
+    }
   };
 
   useEffect(() => {
+    const storedFetchTime = window.localStorage.getItem(fetchTimeStorageKey);
+    if (storedFetchTime) {
+      setLastStatusFetchAt(storedFetchTime);
+    }
+
     loadConnectionStatus();
 
     const intervalId = window.setInterval(() => {
@@ -238,7 +251,7 @@ export default function App() {
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const backendHealthy = backendHealth?.status === "ok";
+  const backendHealthy = isRecentWithinMinutes(lastStatusFetchAt, 60);
   const backendTone = getBackendStatusTone(backendHealth?.status);
   const mongoState = systemStatus?.database?.state || "unknown";
   const mongoTone = getMongoStatusTone(mongoState);
@@ -535,16 +548,16 @@ export default function App() {
             <span>{API_BASE_URL}</span>
           </div>
           <div className="status-row">
+            <strong>Last connectivity check:</strong>
+            <span>{formatTime(lastStatusFetchAt)}</span>
+          </div>
+          <div className="status-row">
             <strong>Backend healthcheck:</strong>
             <span className="status-value">
               <span className={`status-dot-${backendTone}`} aria-hidden="true" />
               {backendHealthy ? "Healthy" : "Stale or unavailable"}
-              {backendHealth?.timestamp ? ` (checked ${formatTime(backendHealth.timestamp)})` : ""}
+              {lastStatusFetchAt ? ` (last success ${formatTime(lastStatusFetchAt)})` : ""}
             </span>
-          </div>
-          <div className="status-row">
-            <strong>Backend uptime:</strong>
-            <span>{backendHealth?.uptime != null ? `${backendHealth.uptime} seconds` : "Not available"}</span>
           </div>
           <div className="status-row">
             <strong>Health endpoint:</strong>
