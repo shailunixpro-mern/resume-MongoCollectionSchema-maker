@@ -255,7 +255,6 @@ export default function App() {
   const mongoFresh = isRecentWithinMinutes(systemStatus?.database?.lastConnectedAt, 60);
   const mongoUriToShow =
     systemStatus?.database?.mongoUri ||
-    systemStatus?.database?.host ||
     "Unavailable. Set EXPOSE_MONGO_URI_TO_CLIENT=true in backend env to expose it.";
 
   const listCollections = async () => {
