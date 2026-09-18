@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname}:5000`;
+  import.meta.env.VITE_API_BASE_URL || "https://resume-backend-fnjs.onrender.com";
 
 const DEFAULT_FIELD = { name: "", bsonType: "string", required: true };
 const DEFAULT_EDIT_FIELD = {
@@ -229,13 +229,13 @@ export default function App() {
     ]);
 
     if (healthResult.status === "fulfilled") {
-      setBackendHealth(healthResult.value.data || null);
+      setBackendHealth(healthResult.value || null);
     } else {
       setBackendHealth(null);
     }
 
     if (statusResult.status === "fulfilled") {
-      setSystemStatus(statusResult.value.data || null);
+      setSystemStatus(statusResult.value || null);
     } else {
       setSystemStatus(null);
     }
