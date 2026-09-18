@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://resume-backend-fnjs.onrender.com";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const DEFAULT_FIELD = { name: "", bsonType: "string", required: true };
 const DEFAULT_EDIT_FIELD = {
@@ -21,6 +21,26 @@ const formatTime = (iso) => {
   }
 
   return new Date(iso).toLocaleString();
+};
+
+const getBackendStatusTone = (backendStatus) => {
+  if (backendStatus === "ok") {
+    return "green";
+  }
+
+  return "red";
+};
+
+const getMongoStatusTone = (connectionState) => {
+  if (connectionState === "connected") {
+    return "green";
+  }
+
+  if (connectionState === "connecting") {
+    return "yellow";
+  }
+
+  return "red";
 };
 
 const isRecentWithinMinutes = (iso, minutes) => {
@@ -210,12 +230,21 @@ export default function App() {
 
   useEffect(() => {
     loadConnectionStatus();
+
+    const intervalId = window.setInterval(() => {
+      loadConnectionStatus();
+    }, 30000);
+
+    return () => window.clearInterval(intervalId);
   }, []);
 
-  const backendFresh = isRecentWithinMinutes(backendHealth?.timestamp, 60);
-  const mongoFresh = isRecentWithinMinutes(systemStatus?.database?.lastConnectedAt, 60);
+  const backendHealthy = backendHealth?.status === "ok";
+  const backendTone = getBackendStatusTone(backendHealth?.status);
+  const mongoState = systemStatus?.database?.state || "unknown";
+  const mongoTone = getMongoStatusTone(mongoState);
   const mongoUriToShow =
     systemStatus?.database?.mongoUri ||
+    systemStatus?.database?.host ||
     "Unavailable. Set EXPOSE_MONGO_URI_TO_CLIENT=true in backend env to expose it.";
 
   const listCollections = async () => {
@@ -508,10 +537,14 @@ export default function App() {
           <div className="status-row">
             <strong>Backend healthcheck:</strong>
             <span className="status-value">
-              <span className={backendFresh ? "status-dot-green" : "status-dot-red"} aria-hidden="true" />
-              {backendFresh ? "Healthy" : "Stale or unavailable"}
-              {backendHealth?.timestamp ? ` (last success ${formatTime(backendHealth.timestamp)})` : ""}
+              <span className={`status-dot-${backendTone}`} aria-hidden="true" />
+              {backendHealthy ? "Healthy" : "Stale or unavailable"}
+              {backendHealth?.timestamp ? ` (checked ${formatTime(backendHealth.timestamp)})` : ""}
             </span>
+          </div>
+          <div className="status-row">
+            <strong>Backend uptime:</strong>
+            <span>{backendHealth?.uptime != null ? `${backendHealth.uptime} seconds` : "Not available"}</span>
           </div>
           <div className="status-row">
             <strong>Health endpoint:</strong>
@@ -528,8 +561,14 @@ export default function App() {
           <div className="status-row">
             <strong>MongoDB connection status:</strong>
             <span className="status-value">
-              <span className={mongoFresh ? "status-dot-green" : "status-dot-red"} aria-hidden="true" />
-              {mongoFresh ? "Connected recently" : "Not connected in last 60 mins"}
+              <span className={`status-dot-${mongoTone}`} aria-hidden="true" />
+              {mongoState === "connected"
+                ? "Connected"
+                : mongoState === "connecting"
+                  ? "Connecting"
+                  : mongoState === "disconnected"
+                    ? "Disconnected"
+                    : "Unknown"}
               {systemStatus?.database?.state ? ` (${systemStatus.database.state})` : ""}
             </span>
           </div>
