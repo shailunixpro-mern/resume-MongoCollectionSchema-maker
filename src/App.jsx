@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+  import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname}:5000`;
 
 const DEFAULT_FIELD = { name: "", bsonType: "string", required: true };
 const DEFAULT_EDIT_FIELD = {
