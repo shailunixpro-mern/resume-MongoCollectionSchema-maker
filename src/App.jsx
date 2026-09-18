@@ -496,48 +496,6 @@ export default function App() {
 
           {showSchemaBuilder && (
             <div className="builder">
-
-        <section className="card">
-          <h2>4) Edit an existing collection</h2>
-          <div className="inline-row">
-            <input
-              type="text"
-              placeholder="Collection name to edit"
-              value={editName}
-              onChange={(event) => setEditName(event.target.value)}
-            />
-            <button type="button" onClick={loadCollectionForEdit} disabled={isBusy}>
-              Load collection schema
-            </button>
-          </div>
-
-          {showEditBuilder && (
-            <div className="builder">
-              <h3>Edit collection fields</h3>
-              {editRows.map((row, index) => (
-                <SchemaFieldRow
-                  key={`${row.originalName || row.name || "new"}-${index}`}
-                  row={row}
-                  index={index}
-                  supportedTypes={supportedTypes}
-                  mode="edit"
-                  onChange={updateEditRow}
-                  onAddRow={addEditRow}
-                  onToggleDelete={toggleDeleteEditRow}
-                />
-              ))}
-
-              <div className="builder-actions">
-                <button type="button" onClick={submitEditCollection} disabled={isBusy}>
-                  Save schema changes
-                </button>
-                <button type="button" className="secondary" onClick={clearEditBuilder} disabled={isBusy}>
-                  Close editor
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
               <h3>Define collection variables</h3>
               {rows.map((row, index) => (
                 <div key={`${index}-${row.name}`} className="builder-row">
@@ -580,6 +538,53 @@ export default function App() {
                 </button>
                 <button type="button" className="secondary" onClick={clearBuilder} disabled={isBusy}>
                   Clear
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="card">
+          <h2>4) Edit an existing collection</h2>
+          <div className="inline-row">
+            <input
+              type="text"
+              placeholder="Collection name to edit"
+              value={editName}
+              onChange={(event) => setEditName(event.target.value)}
+            />
+            <button type="button" onClick={loadCollectionForEdit} disabled={isBusy}>
+              Load collection schema
+            </button>
+          </div>
+
+          {showEditBuilder && (
+            <div className="builder">
+              <h3>Edit collection fields</h3>
+              {editRows.map((row, index) => (
+                <SchemaFieldRow
+                  key={`${row.originalName || row.name || "new"}-${index}`}
+                  row={row}
+                  index={index}
+                  supportedTypes={supportedTypes}
+                  mode="edit"
+                  onChange={updateEditRow}
+                  onAddRow={addEditRow}
+                  onToggleDelete={toggleDeleteEditRow}
+                />
+              ))}
+
+              <div className="builder-actions">
+                <button type="button" onClick={submitEditCollection} disabled={isBusy}>
+                  Save schema changes
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={clearEditBuilder}
+                  disabled={isBusy}
+                >
+                  Close editor
                 </button>
               </div>
             </div>
