@@ -639,7 +639,7 @@ export default function App() {
             <div className="builder">
               <h3>Define collection variables</h3>
               {rows.map((row, index) => (
-                <div key={`${index}-${row.name}`} className="builder-row">
+                <div key={index} className="builder-row">
                   <input
                     type="text"
                     placeholder="Variable"
@@ -704,7 +704,7 @@ export default function App() {
               <h3>Edit collection fields</h3>
               {editRows.map((row, index) => (
                 <SchemaFieldRow
-                  key={`${row.originalName || row.name || "new"}-${index}`}
+                  key={index}
                   row={row}
                   index={index}
                   supportedTypes={supportedTypes}
