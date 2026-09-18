@@ -177,7 +177,7 @@ export default function App() {
   const [describeOutput, setDescribeOutput] = useState("No description loaded yet.");
   const [backendHealth, setBackendHealth] = useState(null);
   const [systemStatus, setSystemStatus] = useState(null);
-  const [lastStatusFetchAt, setLastStatusFetchAt] = useState("");
+  const [lastDataFetchAt, setLastDataFetchAt] = useState("");
 
   const [createName, setCreateName] = useState("");
   const [rows, setRows] = useState([{ ...DEFAULT_FIELD }]);
@@ -189,7 +189,7 @@ export default function App() {
 
   const [statusText, setStatusText] = useState("Status messages and command output will appear here.");
   const [isBusy, setIsBusy] = useState(false);
-  const fetchTimeStorageKey = "lastSuccessfulConnectivityCheckAt";
+  const fetchTimeStorageKey = "lastSuccessfulPortfolioFetchAt";
 
   const supportedTypes = useMemo(
     () => [
@@ -211,6 +211,17 @@ export default function App() {
     []
   );
 
+  const loadPortfolio = async () => {
+    try {
+      await apiCall("/api/portfolio");
+      const fetchTime = new Date().toISOString();
+      setLastDataFetchAt(fetchTime);
+      window.localStorage.setItem(fetchTimeStorageKey, fetchTime);
+    } catch {
+      // Keep the last successful fetch time intact when the API is unavailable.
+    }
+  };
+
   const loadConnectionStatus = async () => {
     const [healthResult, statusResult] = await Promise.allSettled([
       apiCall("/api/health"),
@@ -228,33 +239,20 @@ export default function App() {
     } else {
       setSystemStatus(null);
     }
-
-    if (healthResult.status === "fulfilled" && statusResult.status === "fulfilled") {
-      const fetchTime = new Date().toISOString();
-      setLastStatusFetchAt(fetchTime);
-      window.localStorage.setItem(fetchTimeStorageKey, fetchTime);
-    }
   };
 
   useEffect(() => {
     const storedFetchTime = window.localStorage.getItem(fetchTimeStorageKey);
     if (storedFetchTime) {
-      setLastStatusFetchAt(storedFetchTime);
+      setLastDataFetchAt(storedFetchTime);
     }
 
+    loadPortfolio();
     loadConnectionStatus();
-
-    const intervalId = window.setInterval(() => {
-      loadConnectionStatus();
-    }, 30000);
-
-    return () => window.clearInterval(intervalId);
   }, []);
 
-  const backendHealthy = isRecentWithinMinutes(lastStatusFetchAt, 60);
-  const backendTone = getBackendStatusTone(backendHealth?.status);
-  const mongoState = systemStatus?.database?.state || "unknown";
-  const mongoTone = getMongoStatusTone(mongoState);
+  const backendFresh = isRecentWithinMinutes(lastDataFetchAt, 60);
+  const mongoFresh = isRecentWithinMinutes(systemStatus?.database?.lastConnectedAt, 60);
   const mongoUriToShow =
     systemStatus?.database?.mongoUri ||
     systemStatus?.database?.host ||
@@ -548,15 +546,18 @@ export default function App() {
             <span>{API_BASE_URL}</span>
           </div>
           <div className="status-row">
-            <strong>Last connectivity check:</strong>
-            <span>{formatTime(lastStatusFetchAt)}</span>
+            <strong>Last portfolio fetch:</strong>
+            <span>{formatTime(lastDataFetchAt)}</span>
           </div>
           <div className="status-row">
             <strong>Backend healthcheck:</strong>
             <span className="status-value">
-              <span className={`status-dot-${backendTone}`} aria-hidden="true" />
-              {backendHealthy ? "Healthy" : "Stale or unavailable"}
-              {lastStatusFetchAt ? ` (last success ${formatTime(lastStatusFetchAt)})` : ""}
+              <span
+                className={backendFresh ? "status-dot-green" : "status-dot-red"}
+                aria-hidden="true"
+              />
+              {backendFresh ? "Healthy" : "Stale or unavailable"}
+              {lastDataFetchAt ? ` (last success ${formatTime(lastDataFetchAt)})` : ""}
             </span>
           </div>
           <div className="status-row">
@@ -574,14 +575,11 @@ export default function App() {
           <div className="status-row">
             <strong>MongoDB connection status:</strong>
             <span className="status-value">
-              <span className={`status-dot-${mongoTone}`} aria-hidden="true" />
-              {mongoState === "connected"
-                ? "Connected"
-                : mongoState === "connecting"
-                  ? "Connecting"
-                  : mongoState === "disconnected"
-                    ? "Disconnected"
-                    : "Unknown"}
+              <span
+                className={mongoFresh ? "status-dot-green" : "status-dot-red"}
+                aria-hidden="true"
+              />
+              {mongoFresh ? "Connected recently" : "Not connected in last 60 mins"}
               {systemStatus?.database?.state ? ` (${systemStatus.database.state})` : ""}
             </span>
           </div>

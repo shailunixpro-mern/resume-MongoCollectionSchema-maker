@@ -76,7 +76,6 @@ body {
 }
 
 .status-dot-green,
-.status-dot-yellow,
 .status-dot-red {
   width: 10px;
   height: 10px;
@@ -88,11 +87,6 @@ body {
 .status-dot-green {
   background: #56f39a;
   box-shadow: 0 0 0 3px rgba(86, 243, 154, 0.2);
-}
-
-.status-dot-yellow {
-  background: #ffd166;
-  box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.22);
 }
 
 .status-dot-red {
