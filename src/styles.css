@@ -49,6 +49,51 @@ body {
   padding: 16px;
 }
 
+.status-panel {
+  background: rgba(23, 31, 52, 0.92);
+  color: #f4f7ff;
+  border-color: rgba(133, 160, 210, 0.45);
+  display: grid;
+  gap: 8px;
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.status-row strong {
+  color: #ffcf9e;
+}
+
+.status-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot-green,
+.status-dot-red {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.status-dot-green {
+  background: #56f39a;
+  box-shadow: 0 0 0 3px rgba(86, 243, 154, 0.2);
+}
+
+.status-dot-red {
+  background: #ff6d6d;
+  box-shadow: 0 0 0 3px rgba(255, 109, 109, 0.25);
+}
+
 .hero h1 {
   margin: 0;
   font-size: clamp(1.6rem, 3vw, 2.3rem);

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "https://resume-backend-fnjs.onrender.com";
@@ -14,6 +14,28 @@ const DEFAULT_EDIT_FIELD = {
 };
 
 const prettify = (value) => JSON.stringify(value, null, 2);
+
+const formatTime = (iso) => {
+  if (!iso) {
+    return "Not available";
+  }
+
+  return new Date(iso).toLocaleString();
+};
+
+const isRecentWithinMinutes = (iso, minutes) => {
+  if (!iso) {
+    return false;
+  }
+
+  const parsed = new Date(iso).getTime();
+  if (Number.isNaN(parsed)) {
+    return false;
+  }
+
+  const elapsedMs = Date.now() - parsed;
+  return elapsedMs <= minutes * 60 * 1000;
+};
 
 const normalizeBsonType = (definition) => {
   if (!definition || typeof definition !== "object") {
@@ -133,6 +155,8 @@ export default function App() {
   const [collectionsOutput, setCollectionsOutput] = useState("No data loaded yet.");
   const [describeName, setDescribeName] = useState("");
   const [describeOutput, setDescribeOutput] = useState("No description loaded yet.");
+  const [backendHealth, setBackendHealth] = useState(null);
+  const [systemStatus, setSystemStatus] = useState(null);
 
   const [createName, setCreateName] = useState("");
   const [rows, setRows] = useState([{ ...DEFAULT_FIELD }]);
@@ -164,6 +188,35 @@ export default function App() {
     ],
     []
   );
+
+  const loadConnectionStatus = async () => {
+    const [healthResult, statusResult] = await Promise.allSettled([
+      apiCall("/api/health"),
+      apiCall("/api/system/status"),
+    ]);
+
+    if (healthResult.status === "fulfilled") {
+      setBackendHealth(healthResult.value.data || null);
+    } else {
+      setBackendHealth(null);
+    }
+
+    if (statusResult.status === "fulfilled") {
+      setSystemStatus(statusResult.value.data || null);
+    } else {
+      setSystemStatus(null);
+    }
+  };
+
+  useEffect(() => {
+    loadConnectionStatus();
+  }, []);
+
+  const backendFresh = isRecentWithinMinutes(backendHealth?.timestamp, 60);
+  const mongoFresh = isRecentWithinMinutes(systemStatus?.database?.lastConnectedAt, 60);
+  const mongoUriToShow =
+    systemStatus?.database?.mongoUri ||
+    "Unavailable. Set EXPOSE_MONGO_URI_TO_CLIENT=true in backend env to expose it.";
 
   const listCollections = async () => {
     setIsBusy(true);
@@ -447,6 +500,45 @@ export default function App() {
     <div className="page">
       <div className="background-glow" />
       <main className="container">
+        <section className="card status-panel">
+          <div className="status-row">
+            <strong>Frontend to Backend URL:</strong>
+            <span>{API_BASE_URL}</span>
+          </div>
+          <div className="status-row">
+            <strong>Backend healthcheck:</strong>
+            <span className="status-value">
+              <span className={backendFresh ? "status-dot-green" : "status-dot-red"} aria-hidden="true" />
+              {backendFresh ? "Healthy" : "Stale or unavailable"}
+              {backendHealth?.timestamp ? ` (last success ${formatTime(backendHealth.timestamp)})` : ""}
+            </span>
+          </div>
+          <div className="status-row">
+            <strong>Health endpoint:</strong>
+            <span>{systemStatus?.backend?.healthcheckUrl || `${API_BASE_URL}/api/health`}</span>
+          </div>
+          <div className="status-row">
+            <strong>Backend to MongoDB host:</strong>
+            <span>{mongoUriToShow}</span>
+          </div>
+          <div className="status-row">
+            <strong>MongoDB database:</strong>
+            <span>{systemStatus?.database?.dbName || "Not available"}</span>
+          </div>
+          <div className="status-row">
+            <strong>MongoDB connection status:</strong>
+            <span className="status-value">
+              <span className={mongoFresh ? "status-dot-green" : "status-dot-red"} aria-hidden="true" />
+              {mongoFresh ? "Connected recently" : "Not connected in last 60 mins"}
+              {systemStatus?.database?.state ? ` (${systemStatus.database.state})` : ""}
+            </span>
+          </div>
+          <div className="status-row">
+            <strong>MongoDB last connected:</strong>
+            <span>{formatTime(systemStatus?.database?.lastConnectedAt)}</span>
+          </div>
+        </section>
+
         <section className="hero card">
           <h1>Mongo Collection Schema Maker</h1>
           <p>
